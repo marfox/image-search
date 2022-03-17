@@ -16,13 +16,14 @@ PHAB_TASK = 'T293878'
 # Collect HTTP requests, parameters and geo info made against Commons search services
 # Filters:
 # - non-null HTTP parameters
+# - non-null search results
 # - Web source VS API (`source` = {'api', 'web'})
 # - `title` parameter contains 'Special:Search' or 'Special:MediaSearch'
 # - `referer` header contains 'index.php', as suggested in https://phabricator.wikimedia.org/T293878#7665381
 def collect_searches(spark_session):
     initial_query = """SELECT http, params, geocoded_data
     FROM event.mediawiki_cirrussearch_request
-    WHERE database='commonswiki' AND params IS NOT NULL AND source='web'
+    WHERE database='commonswiki' AND params IS NOT NULL AND hits IS NOT NULL AND source='web'
     """
     ddf = spark_session.sql(initial_query)
     filtered = (
