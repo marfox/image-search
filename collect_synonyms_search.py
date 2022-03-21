@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # For each query:
-#   TODO get synonyms search results via
-#   https://commons.wikimedia.org/w/index.php?search=TERM&ns6=1&uselang=LANGUAGE&mediasearch_synonyms
 #   TODO sample the top K results to get a mix of likely positive and negative samples
 # TODO comply with the DB schema expected by the evaluation task front-end
 
+from random import choice
 from sys import argv, exit
+from typing import Iterator, List, Tuple
 
-from pandas import DataFrame as PandasDataFrame, concat
+import requests
+
+from pandas import DataFrame as PandasDataFrame
 from pyspark.sql import DataFrame as SparkDataFrame, SparkSession
 from wmfdata.spark import get_session
 
+# Queries
 N_SAMPLES = 1000
 RANDOM_SEED = 1984
 PHAB_TASK = 'T293878'
@@ -21,6 +24,9 @@ STOPWORDS = {
     'intercourse', 'masturbation', 'nude', 'orgasm', 'penis', 'porn',
     'sex', 'squirt', 'tits', 'urination', 'vagina', 'vulva'
 }
+
+# Results
+API_ENDPOINT = 'https://commons.wikimedia.org/w/index.php'
 
 # Collect HTTP requests, parameters and geo info made against Commons search services
 # Filters:
@@ -92,6 +98,40 @@ def sample_queries(searches: SparkDataFrame) -> PandasDataFrame:
                 to_filter.append(row.term)
 
     return sample[~sample.term.isin(to_filter)]
+
+
+
+def fetch_results(queries: PandasDataFrame) -> Iterator[List[Tuple[str, float]]]:
+    params = {
+        'mediasearch_synonyms': 1, 'cirrusDumpResult': 1, 'ns6': 1,
+        'search': None, 'uselang': None
+    }
+
+    for row in queries.itertuples():
+        term = row.term
+        lang = choice(row.lang.split(','))  # Pick a random language
+        params['search'] = term
+        params['uselang'] = lang
+
+        response = requests.get(API_ENDPOINT, params=params)
+
+        if not response.ok:
+            print(f'Skipping request failed with HTTP {response.status_code} ...')
+            continue
+
+        try:
+            json = response.json()
+        except requests.exceptions.JSONDecodeError as jde:
+            print('Skipping unexpected non-JSON response ...')
+            continue
+
+        try:
+            results = json['__main__']['result']['hits']['hits']
+        except KeyError as ke:
+            print(f'Skipping response with missing JSON keys: {ke}')
+            continue
+
+        yield [(r['_source']['title'], r['_score'],) for r in results]
 
 
 def main(args):
