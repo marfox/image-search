@@ -131,6 +131,10 @@ def fetch_results(queries: PandasDataFrame) -> Iterator[List[Tuple[str, float]]]
             print(f'Skipping response with missing JSON keys: {ke}')
             continue
 
+        if not results:
+            print(f'Skipping {lang} query with no results: {term}')
+            continue
+
         yield [(r['_source']['title'], r['_score'],) for r in results]
 
 
