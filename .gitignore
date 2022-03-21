@@ -1,2 +1,5 @@
+# Python stuff
+__pycache__
+
 # Vi swap files
 *.swp
