@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# For each query:
-#   TODO sample the top K results to get a mix of likely positive and negative samples
-# TODO comply with the DB schema expected by the evaluation task front-end
 
-from random import choice
+import random
 from sys import argv, exit
-from typing import Iterator, List, Tuple
+from typing import Iterator
 
 import requests
 
-from pandas import DataFrame as PandasDataFrame
+from pandas import concat, DataFrame as PandasDataFrame
 from pyspark.sql import DataFrame as SparkDataFrame, SparkSession
 from wmfdata.spark import get_session
 
@@ -27,6 +24,9 @@ STOPWORDS = {
 
 # Results
 API_ENDPOINT = 'https://commons.wikimedia.org/w/index.php'
+K = 10
+COLUMNS = ('searchTerm', 'language', 'result', 'score',)
+
 
 # Collect HTTP requests, parameters and geo info made against Commons search services
 # Filters:
@@ -101,7 +101,7 @@ def sample_queries(searches: SparkDataFrame) -> PandasDataFrame:
 
 
 
-def fetch_results(queries: PandasDataFrame) -> Iterator[List[Tuple[str, float]]]:
+def fetch_results(queries: PandasDataFrame) -> Iterator:
     params = {
         'mediasearch_synonyms': 1, 'cirrusDumpResult': 1, 'ns6': 1,
         'search': None, 'uselang': None
@@ -109,7 +109,7 @@ def fetch_results(queries: PandasDataFrame) -> Iterator[List[Tuple[str, float]]]
 
     for row in queries.itertuples():
         term = row.term
-        lang = choice(row.lang.split(','))  # Pick a random language
+        lang = random.choice(row.lang.split(','))  # Pick a random language
         params['search'] = term
         params['uselang'] = lang
 
@@ -135,7 +135,25 @@ def fetch_results(queries: PandasDataFrame) -> Iterator[List[Tuple[str, float]]]
             print(f'Skipping {lang} query with no results: {term}')
             continue
 
-        yield [(r['_source']['title'], r['_score'],) for r in results]
+        # Sample the top `K` results to get a mix of likely positive and negative samples
+        n_results = len(results)
+        k = K if n_results >= K else n_results
+        yield sorted(
+            random.sample(
+                [(term, lang, r['_source']['title'], r['_score'],) for r in results], k
+            ),
+            key=lambda x: x[-1], reverse=True  # Sort by descending score
+        )
+
+
+def dump_output(results: Iterator, output_csv: str) -> None:
+    df = concat([PandasDataFrame(r, columns=COLUMNS) for r in results])
+    # TODO dump to Toolforge SQL DB
+    #      see https://github.com/Wikidata/soweego/blob/fef92ae2732f3c2bebf67c4584c5b49e4362914b/soweego/commons/db_manager.py#L38
+    #      from sqlalchemy import create_engine
+    #      engine = create_engine('mysql://scott:tiger@localhost/test')
+    #      df.to_sql(name='ratedSearchResult', con=SQLALCHEMY, if_exists='append', index_label='id'
+    df.to_csv(output_csv)
 
 
 def main(args):
@@ -147,9 +165,12 @@ def main(args):
 
     searches = collect_searches(spark)
     sample = sample_queries(searches)
-    sample.to_csv(args[1])
 
     spark.stop()
+
+    results = fetch_results(sample)
+    dump_output(results, argv[1])
+
     return 0
 
 
