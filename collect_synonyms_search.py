@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""Collect a dataset to be labeled for Commons synonyms search evaluation.
+Queries come from the production Commons search logs.
+This script must run in an Analytics client machine, tested on stat1008.
+It outputs a CSV file ready to be consumed by `feed_toolforge_db.py`."""
+
 import random
 from sys import argv, exit
 from typing import Iterator
@@ -148,12 +153,7 @@ def fetch_results(queries: PandasDataFrame) -> Iterator:
 
 def dump_output(results: Iterator, output_csv: str) -> None:
     df = concat([PandasDataFrame(r, columns=COLUMNS) for r in results])
-    # TODO dump to Toolforge SQL DB
-    #      see https://github.com/Wikidata/soweego/blob/fef92ae2732f3c2bebf67c4584c5b49e4362914b/soweego/commons/db_manager.py#L38
-    #      from sqlalchemy import create_engine
-    #      engine = create_engine('mysql://scott:tiger@localhost/test')
-    #      df.to_sql(name='ratedSearchResult', con=SQLALCHEMY, if_exists='append', index_label='id'
-    df.to_csv(output_csv)
+    df.to_csv(output_csv, index=False)
 
 
 def main(args):
@@ -169,7 +169,7 @@ def main(args):
     spark.stop()
 
     results = fetch_results(sample)
-    dump_output(results, argv[1])
+    dump_output(results, args[1])
 
     return 0
 
