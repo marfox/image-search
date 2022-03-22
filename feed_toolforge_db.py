@@ -18,6 +18,7 @@ DB credentials should be passed as a JSON file like this:
 "host" is optional and defaults to "tools.db.svc.eqiad.wmflabs".
 """
 
+import json
 from sys import argv, exit
 
 import pandas as pd
@@ -30,7 +31,7 @@ DEFAULT_HOST = 'tools.db.svc.eqiad.wmflabs'
 
 def main(args):
     if len(args) != 3:
-        print(f'Usage: python {__file__} INPUT_CSV CREDENTIALS_JSON')
+        print('Usage: python {} INPUT_CSV CREDENTIALS_JSON'.format(__file__))
         return 1
 
     df = pd.read_csv(args[1])
