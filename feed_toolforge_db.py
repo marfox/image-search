@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# !pip install sqlalchemy pymysql
 
 """Load the CSV dataset output by `collect_synonyms_search.py` and feed the given Toolforge DB table.
 This script must run on `media-search-signal-test` in Toolforge.
