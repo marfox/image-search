@@ -30,7 +30,7 @@ STOPWORDS = {
 # Results
 API_ENDPOINT = 'https://commons.wikimedia.org/w/index.php'
 K = 10
-COLUMNS = ('searchTerm', 'language', 'result', 'score',)
+COLUMNS = ('search_id', 'term', 'language', 'result', 'score',)
 
 
 # Collect HTTP requests, parameters and geo info made against Commons search services
@@ -112,6 +112,7 @@ def fetch_results(queries: PandasDataFrame) -> Iterator:
         'search': None, 'uselang': None
     }
 
+    search_id = 1
     for row in queries.itertuples():
         term = row.term
         lang = random.choice(row.lang.split(','))  # Pick a random language
@@ -145,10 +146,12 @@ def fetch_results(queries: PandasDataFrame) -> Iterator:
         k = K if n_results >= K else n_results
         yield sorted(
             random.sample(
-                [(term, lang, r['_source']['title'], r['_score'],) for r in results], k
+                [(search_id, term, lang, r['_source']['title'], r['_score'],) for r in results], k
             ),
             key=lambda x: x[-1], reverse=True  # Sort by descending score
         )
+
+        search_id += 1
 
 
 def dump_output(results: Iterator, output_csv: str) -> None:
