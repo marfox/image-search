@@ -36,6 +36,13 @@ def main(args):
         return 1
 
     df = pd.read_csv(args[1])
+    # Determine max length for string columns
+    max_lengths = {
+        'term': df['term'].str.len().max(),
+        'language': df['language'].str.len().max(),
+        'result': df['result'].str.len().max()
+    }
+
     with open(args[2]) as fin:
         creds = json.load(fin)
 
@@ -51,11 +58,13 @@ def main(args):
 
     schema = {
         'id': Integer(), 'search_id': Integer(),
-        'term': String(255), 'language': String(10), 'result': String(255),
+        'term': String(max_lengths['term']),
+        'language': String(max_lengths['language']),
+        'result': String(max_lengths['result']),
         'score': Float(), 'rating': SmallInteger()
     }
     df['rating'] = None # Add rating column
-    df.to_sql(name=creds['table'], con=engine, if_exists='append', index_label='id', dtype=schema)
+    df.to_sql(name=creds['table'], con=engine, if_exists='replace', index_label='id', dtype=schema)
 
     return 0
 
