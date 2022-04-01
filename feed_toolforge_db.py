@@ -23,6 +23,7 @@ from sys import argv, exit
 
 import pandas as pd
 from sqlalchemy import create_engine
+from sqlalchemy.types import Float, Integer, SmallInteger, String
 
 ENGINE_TEMPLATE = '{engine}://{user}:{password}@{host}/{db}'
 DEFAULT_ENGINE = 'mysql+pymysql'
@@ -48,8 +49,13 @@ def main(args):
         )
     )
 
-    # Drop score
-    df.drop(columns='score').to_sql(name=creds['table'], con=engine, if_exists='append', index=False)
+    schema = {
+        'id': Integer(), 'search_id': Integer(),
+        'term': String(255), 'language': String(10), 'result': String(255),
+        'score': Float(), 'rating': SmallInteger()
+    }
+    df['rating'] = None # Add rating column
+    df.to_sql(name=creds['table'], con=engine, if_exists='append', index_label='id', dtype=schema)
 
     return 0
 
