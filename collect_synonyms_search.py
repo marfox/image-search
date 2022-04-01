@@ -28,8 +28,9 @@ STOPWORDS = {
 }
 
 # Results
+TOP = 50
+K = 12  # Amount of images that will be shown
 API_ENDPOINT = 'https://commons.wikimedia.org/w/index.php'
-K = 10
 COLUMNS = ('search_id', 'term', 'language', 'result', 'score',)
 
 
@@ -86,13 +87,13 @@ def sample_queries(searches: SparkDataFrame) -> PandasDataFrame:
         .reset_index()  # `groupby` turns the group into an index, we use a column instead
     )
 
-    # Sampling weighted on frequencies, i.e., popular queries are more likely to be sampled
+    # Sampling weighted on traffic (frequencies): popular queries are more likely to be sampled
     # NOTE consider manual sampling from top & bottom slices, e.g.:
-    # threshold = 50
-    # top = freqs[freqs.ip >= threshold]
-    # bottom = freq[freqs.ip < threshold]
-    # top_sample = top.sample(n=N_SAMPLES / 2, random_state=RANDOM_SEED)
-    # bottom_sample = bottom.sample(n=N_SAMPLES / 2, random_state=RANDOM_SEED)
+    #      threshold = 50
+    #      top = freqs[freqs.ip >= threshold]
+    #      bottom = freq[freqs.ip < threshold]
+    #      top_sample = top.sample(n=N_SAMPLES / 2, random_state=RANDOM_SEED)
+    #      bottom_sample = bottom.sample(n=N_SAMPLES / 2, random_state=RANDOM_SEED)
     sample = freqs.sample(n=N_SAMPLES, weights='ip', random_state=RANDOM_SEED)
 
     # Best effort to filter stopwords
@@ -107,9 +108,10 @@ def sample_queries(searches: SparkDataFrame) -> PandasDataFrame:
 
 
 def fetch_results(queries: PandasDataFrame) -> Iterator:
+    # Ensure to fetch `TOP` results
     params = {
         'mediasearch_synonyms': 1, 'cirrusDumpResult': 1, 'ns6': 1,
-        'search': None, 'uselang': None
+        'limit': TOP, 'search': None, 'uselang': None
     }
 
     search_id = 1
@@ -141,9 +143,10 @@ def fetch_results(queries: PandasDataFrame) -> Iterator:
             print(f'Skipping {lang} query with no results: {term}')
             continue
 
-        # Sample the top `K` results to get a mix of likely positive and negative samples
+        # Sample `K` results from the ideal `TOP` to get a mix of likely positive and negative samples
         n_results = len(results)
-        k = K if n_results >= K else n_results
+        print(n_results)
+        k = K if n_results >= K else n_results  # In case of too few results, just shuffle them
         yield sorted(
             random.sample(
                 [(search_id, term, lang, r['_source']['title'], r['_score'],) for r in results], k
