@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# TODO filter NSFW with ML:
+#      https://github.com/HarshineeSriram/Image-Content-Filtration
 
 """Collect a dataset to be labeled for Commons synonyms search evaluation.
 Queries come from the production Commons search logs.
